@@ -98,35 +98,36 @@ int lower_bound_using_lp(tsp_path_t path, int hops, int len, uint64_t vpres) {
 
   if (SOLVEUR == SOLVEUR_NONE) {
     return 0;
+  } else {
+    FILE *f = fopen("toto.lp","w");
+    save_lp(f, path, hops, len, vpres);
+    fclose(f);
+
+    double val=0.0;
+    FILE *sol=0;
+
+    switch(SOLVEUR) {
+    case SOLVEUR_CBC:
+      sol = popen("cbc toto.lp | tee toto.sol | grep 'Objective value'","r");
+      fscanf(sol, "Objective value: %lg",& val);
+      fclose(sol);
+      break;
+    case SOLVEUR_SYMPHONY:
+      sol = popen("symphony -L toto.lp | tee toto.sol | grep \"Solution Cost: \"","r");
+      fscanf(sol, "Solution Cost: %lg",& val);
+      fclose(sol);
+      break;
+    case SOLVEUR_GLPSOL:
+      sol = popen("glpsol --lp toto.lp -o /dev/stdout | tee toto.sol | grep 'Objective:  L = '","r");
+      fscanf(sol, "Objective:  L =  %lg",& val);
+      fclose(sol);
+      break;
+    case SOLVEUR_NONE:
+      return 0;
+      break;
+    }
+    int longueur = ((int) val) + len;
+    return longueur;
   }
-
-  FILE *f = fopen("toto.lp","w");
-  save_lp(f, path, hops, len, vpres);
-  fclose(f);
-
-  double val=0.0;
-  FILE *sol=0;
-
-  switch(SOLVEUR_GLPSOL) {
-  case SOLVEUR_CBC:
-    sol = popen("cbc toto.lp | grep 'Objective value'","r");
-    fscanf(sol, "Objective value: %lg",& val);
-    fclose(sol);
-    break;
-  case SOLVEUR_SYMPHONY:
-    sol = popen("symphony -L toto.lp | grep \"Solution Cost: \"","r");
-    fscanf(sol, "Solution Cost: %lg",& val);
-    fclose(sol);
-    break;
-  case SOLVEUR_GLPSOL:
-    sol = popen("glpsol --lp toto.lp -o /dev/stdout | grep 'Objective:  L = '","r");
-    fscanf(sol, "Objective:  L =  %lg",& val);
-    fclose(sol);
-    break;
-  case SOLVEUR_NONE:
-    return 0;
-    break;
-  }
-  int longueur = ((int) val) + len;
-  return longueur;
+  return 0;
 }
