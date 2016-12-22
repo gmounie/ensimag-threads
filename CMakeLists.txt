@@ -7,6 +7,7 @@ project(Ensitsp)
 enable_testing()
 set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wall -Werror -O3 -std=gnu99")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -Werror -O3 -std=gnu++11")
 
 #########
 # Gestion des logins
@@ -16,18 +17,63 @@ set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wall -Werror -O3 -std=gnu99")
 set(LOGINS login1 login2 login3)
 list(SORT LOGINS)
 
+if (LOGINS MATCHES "login[123]")
+  message(FATAL_ERROR "** ERREUR **: Vous devez modifier CMakeLists.txt pour y mettre vos logins")
+endif()
+
+
+
 #####
 # Détection de la bibliothèque de threads et de la bibliothèque de math
 #####
 find_package(Threads)
 find_library(MISC_LIBRARY NAMES m libm rt librt)
 
+##### ENSIMAG-SPECIFIC
+# Utilisation d'un éventuel g++ et gcc dans /opt/gnat/bin
+# (CentOS 6 est en gcc 4.4, sans support de C++-11)
+#####
+if(EXISTS /opt/gnat/bin)
+  set(CMAKE_C_COMPILER /opt/gnat/bin/gcc)
+  set(CMAKE_CXX_COMPILER /opt/gnat/bin/g++)
+endif(EXISTS /opt/gnat/bin)
+
+###
+# Détection d'un solveur linéaire disponible (COINOR-CBC,
+# COINOR-SYMPHONY ou GLPK-GLPSOL)
+###
+# Ordre de préférence: glpsol, symphony, cbc
+# Raison: le programme linéaire est stupide, glpk est le
+# solveur le plus rapide, parce que le plus lèger à démarrer
+# 
+# Si le programme linéaire devient plus intelligent, il faudra revoir
+# les choix
+
+find_program(CBC cbc)
+find_program(SYMPHONY symphony)
+find_program(GLPSOL glpsol)
+
+if (GLPSOL)
+  set(SOLVEUR 2)
+elseif(SYMPHONY)
+  set(SOLVEUR 1)
+elseif(CBC)
+  set(SOLVEUR 0)
+else()
+  set(SOLVEUR 3)
+  message(STATUS "** ERREUR **: aucun solveur linéaire trouvé, votre calcul sera plus lent pour les instance >= 20 villes")
+endif()
+
+configure_file (
+  src/lpsolveurs.h.in
+  ${CMAKE_SOURCE_DIR}/src/lpsolveurs.h
+  )
 
 ##
 # Si vous utilisez d'autres fichiers .c, en plus de ceux listés,
 # il faut les ajouter ici
 ##
-add_executable(ensitsp src/tsp-genmap.c  src/tsp-job.c  src/tsp-main-para.c  src/tsp-print.c  src/tsp-tsp.c src/tsp-lp.c)
+add_executable(ensitsp src/tsp-genmap.c  src/tsp-job.c  src/tsp-main-para.c  src/tsp-print.c  src/tsp-tsp.c src/tsp-lp.c src/tsp-hkbound.cpp)
 target_link_libraries(ensitsp ${CMAKE_THREAD_LIBS_INIT} m rt)
 
 ##
